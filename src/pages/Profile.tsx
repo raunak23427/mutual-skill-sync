@@ -1,376 +1,462 @@
-import { useState, useRef, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
-import { Camera, Plus, X, MapPin, Clock, Save, Upload } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { useProfileSync } from "@/hooks/useProfileSync";
-import { userSkillsService, uploadService } from "@/lib/api";
+import React, { useState, useEffect } from 'react';
+import { useUser } from '@clerk/clerk-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Switch } from '@/components/ui/switch';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { toast } from 'sonner';
+import { MapPin, Star, Camera, Plus, X, Clock } from 'lucide-react';
+import { profileService, skillsService } from '@/lib/api';
+import type { Profile, Skill, UserSkillOffered, UserSkillWanted } from '@/lib/supabase';
 
-const Profile = () => {
-  const { toast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const { profile, loading, updateProfile, clerkUser } = useProfileSync();
+const ProfilePage = () => {
+  const { user } = useUser();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [offeredSkills, setOfferedSkills] = useState<UserSkillOffered[]>([]);
+  const [wantedSkills, setWantedSkills] = useState<UserSkillWanted[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   
-  const [skillsOffered, setSkillsOffered] = useState<string[]>([]);
-  const [skillsWanted, setSkillsWanted] = useState<string[]>([]);
-  const [newSkillOffered, setNewSkillOffered] = useState("");
-  const [newSkillWanted, setNewSkillWanted] = useState("");
-  const [uploading, setUploading] = useState(false);
+  // Form state
+  const [formData, setFormData] = useState({
+    full_name: '',
+    location: '',
+    bio: '',
+    availability: '',
+    is_public: true
+  });
 
-  // Load user skills when profile loads
+  // Skill form state
+  const [skillForm, setSkillForm] = useState({
+    skill_id: '',
+    proficiency_level: '',
+    years_experience: 0,
+    urgency: ''
+  });
+
   useEffect(() => {
-    const loadUserSkills = async () => {
-      if (!profile) return;
-
-      const [offered, wanted] = await Promise.all([
-        userSkillsService.getUserSkillsOffered(profile.id),
-        userSkillsService.getUserSkillsWanted(profile.id)
-      ]);
-
-      setSkillsOffered(offered);
-      setSkillsWanted(wanted);
-    };
-
-    loadUserSkills();
-  }, [profile]);
-
-  const addSkill = async (type: 'offered' | 'wanted') => {
-    const skill = type === 'offered' ? newSkillOffered : newSkillWanted;
-    if (!skill.trim() || !profile) return;
-
-    const success = type === 'offered' 
-      ? await userSkillsService.addSkillOffered(profile.id, skill.trim())
-      : await userSkillsService.addSkillWanted(profile.id, skill.trim());
-
-    if (success) {
-      if (type === 'offered') {
-        setSkillsOffered(prev => [...prev, skill.trim()]);
-        setNewSkillOffered("");
-      } else {
-        setSkillsWanted(prev => [...prev, skill.trim()]);
-        setNewSkillWanted("");
-      }
-      
-      toast({
-        title: "Skill Added",
-        description: `${skill} has been added to your ${type} skills.`,
-      });
-    } else {
-      toast({
-        title: "Error",
-        description: "Failed to add skill. Please try again.",
-        variant: "destructive"
-      });
+    if (user) {
+      loadProfile();
+      loadSkills();
     }
-  };
+  }, [user]);
 
-  const removeSkill = async (type: 'offered' | 'wanted', skillName: string) => {
-    if (!profile) return;
-
-    const success = type === 'offered'
-      ? await userSkillsService.removeSkillOffered(profile.id, skillName)
-      : await userSkillsService.removeSkillWanted(profile.id, skillName);
-
-    if (success) {
-      if (type === 'offered') {
-        setSkillsOffered(prev => prev.filter(skill => skill !== skillName));
-      } else {
-        setSkillsWanted(prev => prev.filter(skill => skill !== skillName));
-      }
-      
-      toast({
-        title: "Skill Removed",
-        description: `${skillName} has been removed from your ${type} skills.`,
-      });
-    } else {
-      toast({
-        title: "Error",
-        description: "Failed to remove skill. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file || !profile || !clerkUser) return;
-
-    setUploading(true);
+  const loadProfile = async () => {
+    if (!user) return;
     
     try {
-      // Upload to Supabase Storage
-      const photoUrl = await uploadService.uploadProfilePhoto(clerkUser.id, file);
-      
-      if (photoUrl) {
-        // Update profile in database
-        await updateProfile({ avatar_url: photoUrl });
-        
-        toast({
-          title: "Photo Updated",
-          description: "Profile photo has been updated successfully!",
+      const profileData = await profileService.getProfile(user.id);
+      if (profileData) {
+        setProfile(profileData);
+        setFormData({
+          full_name: profileData.full_name || '',
+          location: profileData.location || '',
+          bio: profileData.bio || '',
+          availability: profileData.availability || '',
+          is_public: profileData.is_public
         });
-      } else {
-        throw new Error("Upload failed");
       }
+      
+      const offeredData = await skillsService.getUserSkillsOffered(user.id);
+      setOfferedSkills(offeredData || []);
+      
+      const wantedData = await skillsService.getUserSkillsWanted(user.id);
+      setWantedSkills(wantedData || []);
     } catch (error) {
-      console.error("Photo upload error:", error);
-      toast({
-        title: "Upload Failed",
-        description: "Failed to upload photo. Please try again.",
-        variant: "destructive"
-      });
+      console.error('Error loading profile:', error);
+      toast.error('Failed to load profile');
     } finally {
-      setUploading(false);
+      setLoading(false);
     }
   };
 
-  const triggerPhotoUpload = () => {
-    fileInputRef.current?.click();
+  const loadSkills = async () => {
+    try {
+      const skillsData = await skillsService.getAllSkills();
+      setSkills(skillsData || []);
+    } catch (error) {
+      console.error('Error loading skills:', error);
+    }
   };
 
-  const handleSave = async () => {
-    if (!profile) return;
+  const handleSaveProfile = async () => {
+    if (!user) return;
+    
+    setSaving(true);
+    try {
+      const profileData = {
+        id: user.id,
+        clerk_id: user.id,
+        email: user.emailAddresses[0]?.emailAddress || '',
+        ...formData
+      };
 
-    const success = await updateProfile({
-      full_name: profile.full_name,
-      location: profile.location,
-      availability: profile.availability,
-      is_public: profile.is_public
-    });
+      const updatedProfile = await profileService.upsertProfile(profileData);
+      if (updatedProfile) {
+        setProfile(updatedProfile);
+        toast.success('Profile updated successfully');
+      }
+    } catch (error) {
+      console.error('Error saving profile:', error);
+      toast.error('Failed to save profile');
+    } finally {
+      setSaving(false);
+    }
+  };
 
-    if (success) {
-      toast({
-        title: "Profile Updated",
-        description: "Your profile has been saved successfully.",
-      });
-    } else {
-      toast({
-        title: "Error",
-        description: "Failed to save profile. Please try again.",
-        variant: "destructive"
-      });
+  const handleAddOfferedSkill = async () => {
+    if (!user || !skillForm.skill_id || !skillForm.proficiency_level) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      const skillData = {
+        user_id: user.id,
+        skill_id: skillForm.skill_id,
+        proficiency_level: skillForm.proficiency_level,
+        years_experience: skillForm.years_experience || 0
+      };
+
+      await skillsService.addUserSkillOffered(skillData);
+      await loadProfile();
+      setSkillForm({ skill_id: '', proficiency_level: '', years_experience: 0, urgency: '' });
+      toast.success('Skill added successfully');
+    } catch (error) {
+      console.error('Error adding skill:', error);
+      toast.error('Failed to add skill');
+    }
+  };
+
+  const handleAddWantedSkill = async () => {
+    if (!user || !skillForm.skill_id || !skillForm.urgency) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
+
+    try {
+      const skillData = {
+        user_id: user.id,
+        skill_id: skillForm.skill_id,
+        urgency: skillForm.urgency
+      };
+
+      await skillsService.addUserSkillWanted(skillData);
+      await loadProfile();
+      setSkillForm({ skill_id: '', proficiency_level: '', years_experience: 0, urgency: '' });
+      toast.success('Skill added successfully');
+    } catch (error) {
+      console.error('Error adding skill:', error);
+      toast.error('Failed to add skill');
+    }
+  };
+
+  const handleRemoveOfferedSkill = async (skillId: string) => {
+    try {
+      await skillsService.removeUserSkillOffered(skillId);
+      await loadProfile();
+      toast.success('Skill removed successfully');
+    } catch (error) {
+      console.error('Error removing skill:', error);
+      toast.error('Failed to remove skill');
+    }
+  };
+
+  const handleRemoveWantedSkill = async (skillId: string) => {
+    try {
+      await skillsService.removeUserSkillWanted(skillId);
+      await loadProfile();
+      toast.success('Skill removed successfully');
+    } catch (error) {
+      console.error('Error removing skill:', error);
+      toast.error('Failed to remove skill');
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-background py-8 flex items-center justify-center">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  if (!profile) {
-    return (
-      <div className="min-h-screen bg-background py-8 flex items-center justify-center">
-        <div className="text-center">
-          <h2 className="text-xl font-semibold">Profile not found</h2>
-          <p className="text-muted-foreground">Please try refreshing the page.</p>
+      <div className="container mx-auto px-4 py-8">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+          <div className="h-64 bg-gray-200 rounded"></div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background py-8">
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground">Your Profile</h1>
-          <p className="text-muted-foreground mt-2">Manage your skills and preferences</p>
+    <div className="container mx-auto px-4 py-8 max-w-4xl">
+      <div className="space-y-8">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <h1 className="text-3xl font-bold">My Profile</h1>
+          <div className="flex items-center space-x-2">
+            <Star className="w-5 h-5 text-yellow-500" />
+            <span className="text-lg font-semibold">{profile?.rating?.toFixed(1) || '0.0'}</span>
+            <span className="text-muted-foreground">({profile?.total_swaps || 0} swaps)</span>
+          </div>
         </div>
 
-        <div className="grid lg:grid-cols-3 gap-8">
-          {/* Profile Info Card */}
-          <Card className="lg:col-span-1 shadow-soft border-0">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Camera className="w-5 h-5" />
-                Profile Info
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* Profile Photo */}
-              <div className="flex flex-col items-center">
-                <div className="w-24 h-24 bg-gradient-primary rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-medium overflow-hidden">
-                  {profile.avatar_url ? (
-                    <img 
-                      src={profile.avatar_url} 
-                      alt="Profile" 
-                      className="w-full h-full object-cover"
-                    />
-                  ) : (
-                    (profile.full_name || clerkUser?.firstName || "U").charAt(0).toUpperCase()
-                  )}
-                </div>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="mt-2" 
-                  onClick={triggerPhotoUpload}
-                  disabled={uploading}
-                >
-                  <Upload className="w-4 h-4 mr-2" />
-                  {uploading ? "Uploading..." : "Change Photo"}
-                </Button>
-                <input
-                  type="file"
-                  ref={fileInputRef}
-                  className="hidden"
-                  accept="image/*"
-                  onChange={handlePhotoUpload}
-                />
-              </div>
+        <Tabs defaultValue="profile" className="space-y-6">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="profile">Profile Info</TabsTrigger>
+            <TabsTrigger value="skills-offered">Skills I Offer</TabsTrigger>
+            <TabsTrigger value="skills-wanted">Skills I Want</TabsTrigger>
+          </TabsList>
 
-              {/* Basic Info */}
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="name">Name</Label>
-                  <Input
-                    id="name"
-                    value={profile.full_name || ""}
-                    onChange={(e) => updateProfile({ full_name: e.target.value })}
-                  />
-                </div>
-
-                <div>
-                  <Label htmlFor="location">Location</Label>
-                  <div className="relative">
-                    <MapPin className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-                    <Input
-                      id="location"
-                      placeholder="San Francisco, CA"
-                      value={profile.location || ""}
-                      className="pl-10"
-                      onChange={(e) => updateProfile({ location: e.target.value })}
-                    />
+          {/* Profile Info Tab */}
+          <TabsContent value="profile" className="space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <Camera className="w-5 h-5" />
+                  <span>Basic Information</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {/* Avatar */}
+                <div className="flex items-center space-x-4">
+                  <Avatar className="w-20 h-20">
+                    <AvatarImage src={user?.imageUrl} />
+                    <AvatarFallback>
+                      {user?.firstName?.[0]}{user?.lastName?.[0]}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-medium">{user?.fullName}</p>
+                    <p className="text-sm text-muted-foreground">{user?.emailAddresses[0]?.emailAddress}</p>
                   </div>
                 </div>
 
-                <div>
+                {/* Form Fields */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="full_name">Full Name</Label>
+                    <Input
+                      id="full_name"
+                      value={formData.full_name}
+                      onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
+                      placeholder="Enter your full name"
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="location">Location (Optional)</Label>
+                    <div className="relative">
+                      <MapPin className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                      <Input
+                        id="location"
+                        value={formData.location}
+                        onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                        placeholder="City, Country"
+                        className="pl-10"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="bio">Bio</Label>
+                  <Textarea
+                    id="bio"
+                    value={formData.bio}
+                    onChange={(e) => setFormData({ ...formData, bio: e.target.value })}
+                    placeholder="Tell others about yourself..."
+                    rows={3}
+                  />
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="availability">Availability</Label>
                   <div className="relative">
                     <Clock className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
                     <Input
                       id="availability"
-                      placeholder="Weekends, Evenings, etc."
-                      value={profile.availability}
+                      value={formData.availability}
+                      onChange={(e) => setFormData({ ...formData, availability: e.target.value })}
+                      placeholder="e.g., Weekends, Evenings, Flexible"
                       className="pl-10"
-                      onChange={(e) => updateProfile({ availability: e.target.value })}
                     />
                   </div>
                 </div>
 
-                {/* Public Profile Toggle */}
-                <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
-                  <div>
-                    <p className="font-medium">Public Profile</p>
-                    <p className="text-sm text-muted-foreground">Allow others to find you</p>
-                  </div>
+                <div className="flex items-center space-x-2">
                   <Switch
-                    checked={profile.is_public}
-                    onCheckedChange={(checked) => updateProfile({ is_public: checked })}
+                    id="is_public"
+                    checked={formData.is_public}
+                    onCheckedChange={(checked) => setFormData({ ...formData, is_public: checked })}
                   />
+                  <Label htmlFor="is_public">Make profile public</Label>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
 
-          {/* Skills Cards */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* Skills Offered */}
-            <Card className="shadow-soft border-0">
+                <Button onClick={handleSaveProfile} disabled={saving} className="w-full">
+                  {saving ? 'Saving...' : 'Save Profile'}
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Skills Offered Tab */}
+          <TabsContent value="skills-offered" className="space-y-6">
+            <Card>
               <CardHeader>
-                <CardTitle className="text-success">Skills I Can Teach</CardTitle>
-                <p className="text-sm text-muted-foreground">Add skills you can share with others</p>
+                <CardTitle>Skills I Can Teach</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="flex gap-2 mb-4">
+              <CardContent className="space-y-4">
+                {/* Add Skill Form */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4 p-4 border rounded-lg">
+                  <Select value={skillForm.skill_id} onValueChange={(value) => setSkillForm({ ...skillForm, skill_id: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select skill" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {skills.map((skill) => (
+                        <SelectItem key={skill.id} value={skill.id}>
+                          {skill.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={skillForm.proficiency_level} onValueChange={(value) => setSkillForm({ ...skillForm, proficiency_level: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Proficiency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="beginner">Beginner</SelectItem>
+                      <SelectItem value="intermediate">Intermediate</SelectItem>
+                      <SelectItem value="advanced">Advanced</SelectItem>
+                      <SelectItem value="expert">Expert</SelectItem>
+                    </SelectContent>
+                  </Select>
+
                   <Input
-                    placeholder="e.g., JavaScript, Photography"
-                    value={newSkillOffered}
-                    onChange={(e) => setNewSkillOffered(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && addSkill('offered')}
+                    type="number"
+                    placeholder="Years exp."
+                    value={skillForm.years_experience}
+                    onChange={(e) => setSkillForm({ ...skillForm, years_experience: parseInt(e.target.value) || 0 })}
                   />
-                  <Button onClick={() => addSkill('offered')} size="icon">
-                    <Plus className="w-4 h-4" />
+
+                  <Button onClick={handleAddOfferedSkill}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add
                   </Button>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {skillsOffered.map((skill, index) => (
-                    <Badge key={index} variant="secondary" className="bg-success/10 text-success border-success/20">
-                      {skill}
+
+                {/* Skills List */}
+                <div className="space-y-2">
+                  {offeredSkills.map((userSkill) => (
+                    <div key={userSkill.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <Badge variant="outline">{userSkill.skill?.name}</Badge>
+                        <span className="text-sm text-muted-foreground">
+                          {userSkill.proficiency_level}
+                        </span>
+                        {userSkill.years_experience && (
+                          <span className="text-sm text-muted-foreground">
+                            • {userSkill.years_experience} years
+                          </span>
+                        )}
+                      </div>
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-auto p-0 ml-2 hover:bg-transparent"
-                        onClick={() => removeSkill('offered', skill)}
+                        onClick={() => handleRemoveOfferedSkill(userSkill.id)}
                       >
-                        <X className="w-3 h-3" />
+                        <X className="w-4 h-4" />
                       </Button>
-                    </Badge>
+                    </div>
                   ))}
-                  {skillsOffered.length === 0 && (
-                    <p className="text-muted-foreground text-sm">No skills added yet. Add some skills you can teach!</p>
+                  {offeredSkills.length === 0 && (
+                    <p className="text-center text-muted-foreground py-8">
+                      No skills added yet. Add some skills you can teach!
+                    </p>
                   )}
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
 
-            {/* Skills Wanted */}
-            <Card className="shadow-soft border-0">
+          {/* Skills Wanted Tab */}
+          <TabsContent value="skills-wanted" className="space-y-6">
+            <Card>
               <CardHeader>
-                <CardTitle className="text-primary">Skills I Want to Learn</CardTitle>
-                <p className="text-sm text-muted-foreground">Add skills you'd like to learn from others</p>
+                <CardTitle>Skills I Want to Learn</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="flex gap-2 mb-4">
-                  <Input
-                    placeholder="e.g., Python, Cooking"
-                    value={newSkillWanted}
-                    onChange={(e) => setNewSkillWanted(e.target.value)}
-                    onKeyPress={(e) => e.key === 'Enter' && addSkill('wanted')}
-                  />
-                  <Button onClick={() => addSkill('wanted')} size="icon">
-                    <Plus className="w-4 h-4" />
+              <CardContent className="space-y-4">
+                {/* Add Skill Form */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 p-4 border rounded-lg">
+                  <Select value={skillForm.skill_id} onValueChange={(value) => setSkillForm({ ...skillForm, skill_id: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select skill" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {skills.map((skill) => (
+                        <SelectItem key={skill.id} value={skill.id}>
+                          {skill.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+
+                  <Select value={skillForm.urgency} onValueChange={(value) => setSkillForm({ ...skillForm, urgency: value })}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Urgency" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="low">Low</SelectItem>
+                      <SelectItem value="medium">Medium</SelectItem>
+                      <SelectItem value="high">High</SelectItem>
+                    </SelectContent>
+                  </Select>
+
+                  <Button onClick={handleAddWantedSkill}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add
                   </Button>
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  {skillsWanted.map((skill, index) => (
-                    <Badge key={index} variant="secondary" className="bg-primary/10 text-primary border-primary/20">
-                      {skill}
+
+                {/* Skills List */}
+                <div className="space-y-2">
+                  {wantedSkills.map((userSkill) => (
+                    <div key={userSkill.id} className="flex items-center justify-between p-3 border rounded-lg">
+                      <div className="flex items-center space-x-3">
+                        <Badge variant="outline">{userSkill.skill?.name}</Badge>
+                        <Badge 
+                          variant={userSkill.urgency === 'high' ? 'destructive' : userSkill.urgency === 'medium' ? 'default' : 'secondary'}
+                        >
+                          {userSkill.urgency} priority
+                        </Badge>
+                      </div>
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="h-auto p-0 ml-2 hover:bg-transparent"
-                        onClick={() => removeSkill('wanted', skill)}
+                        onClick={() => handleRemoveWantedSkill(userSkill.id)}
                       >
-                        <X className="w-3 h-3" />
+                        <X className="w-4 h-4" />
                       </Button>
-                    </Badge>
+                    </div>
                   ))}
-                  {skillsWanted.length === 0 && (
-                    <p className="text-muted-foreground text-sm">No skills added yet. Add some skills you want to learn!</p>
+                  {wantedSkills.length === 0 && (
+                    <p className="text-center text-muted-foreground py-8">
+                      No skills added yet. Add some skills you want to learn!
+                    </p>
                   )}
                 </div>
               </CardContent>
             </Card>
-
-            {/* Save Button */}
-            <div className="flex justify-end">
-              <Button onClick={handleSave} variant="hero" size="lg">
-                <Save className="w-4 h-4 mr-2" />
-                Save Profile
-              </Button>
-            </div>
-          </div>
-        </div>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
 };
 
-export default Profile;
+export default ProfilePage;

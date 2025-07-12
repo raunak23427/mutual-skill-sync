@@ -1,7 +1,12 @@
 import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { List, Search, Users, Star } from "lucide-react";
+import { useUser, SignUpButton } from '@clerk/clerk-react';
+import { Link } from 'react-router-dom';
 
 const HowItWorks = () => {
+  const { isSignedIn } = useUser();
+  
   const steps = [
     {
       icon: List,
@@ -30,7 +35,7 @@ const HowItWorks = () => {
   ];
 
   return (
-    <section className="py-24 bg-muted/30">
+    <section id="how-it-works" className="py-24 bg-muted/30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Section Header */}
         <div className="text-center mb-16">
@@ -47,7 +52,7 @@ const HowItWorks = () => {
           {steps.map((step, index) => {
             const Icon = step.icon;
             return (
-              <Card key={index} className="relative overflow-hidden border-0 shadow-soft hover:shadow-medium transition-all duration-300 transform hover:scale-105 bg-gradient-card">
+              <Card key={index} className="relative overflow-hidden border-0 shadow-soft hover:shadow-medium transition-all duration-300 transform hover:scale-105 bg-white dark:bg-gray-800">
                 <CardContent className="p-8 text-center">
                   {/* Step Number */}
                   <div className="absolute top-4 right-4 w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center">
@@ -78,12 +83,33 @@ const HowItWorks = () => {
             Ready to start your skill-swapping journey?
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="px-8 py-4 bg-gradient-primary text-primary-foreground rounded-lg font-semibold hover:shadow-glow transform hover:scale-105 transition-all">
-              Get Started Now
-            </button>
-            <button className="px-8 py-4 border border-border bg-background text-foreground rounded-lg font-semibold hover:shadow-medium transform hover:scale-105 transition-all">
-              View Success Stories
-            </button>
+            {isSignedIn ? (
+              <>
+                <Link to="/profile">
+                  <Button size="lg" className="px-8 py-4 h-auto text-lg">
+                    Complete Your Profile
+                  </Button>
+                </Link>
+                <Link to="/search">
+                  <Button variant="outline" size="lg" className="px-8 py-4 h-auto text-lg">
+                    Start Searching
+                  </Button>
+                </Link>
+              </>
+            ) : (
+              <>
+                <SignUpButton mode="modal">
+                  <Button size="lg" className="px-8 py-4 h-auto text-lg">
+                    Get Started Now
+                  </Button>
+                </SignUpButton>
+                <Link to="/feedback">
+                  <Button variant="outline" size="lg" className="px-8 py-4 h-auto text-lg">
+                    View Success Stories
+                  </Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </div>

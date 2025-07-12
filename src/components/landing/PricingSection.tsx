@@ -1,57 +1,63 @@
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Check, Star, Crown, Zap } from "lucide-react";
+import { Check, Star, Crown, Heart } from "lucide-react";
+import { useUser, SignUpButton } from '@clerk/clerk-react';
+import { Link } from 'react-router-dom';
 
 const PricingSection = () => {
+  const { isSignedIn } = useUser();
+
   const plans = [
     {
-      name: "Basic",
-      price: "₹499",
-      period: "/month",
-      description: "Perfect for getting started with skill swapping",
-      icon: Star,
+      name: "Free Forever",
+      price: "₹0",
+      period: "",
+      description: "Everything you need to start skill swapping",
+      icon: Heart,
       features: [
-        "5 skill exchanges per month",
-        "Basic profile features",
+        "Unlimited skill exchanges",
+        "Full profile features",
         "Community access",
-        "Standard support",
-        "Profile verification badge"
+        "Basic matching",
+        "Chat messaging",
+        "Feedback system",
+        "Mobile app access"
       ],
-      popular: false,
-      buttonText: "Start Basic"
+      popular: true,
+      buttonText: "Start Free"
     },
     {
       name: "Pro",
-      price: "₹999",
+      price: "₹299",
       period: "/month",
-      description: "Best for active learners and teachers",
-      icon: Crown,
+      description: "Enhanced features for active learners",
+      icon: Star,
       features: [
-        "Unlimited skill exchanges",
-        "Advanced profile features",
+        "Everything in Free",
         "Priority matching",
+        "Advanced search filters",
         "Video session tools",
         "Progress tracking",
-        "Priority support",
-        "Featured profile listing"
+        "Achievement badges",
+        "Priority support"
       ],
-      popular: true,
+      popular: false,
       buttonText: "Go Pro"
     },
     {
       name: "Expert",
-      price: "₹1,999",
+      price: "₹599",
       period: "/month",
       description: "For professional educators and mentors",
-      icon: Zap,
+      icon: Crown,
       features: [
         "Everything in Pro",
         "Monetize your skills",
-        "Course creation tools",
         "Analytics dashboard",
-        "Custom branding",
-        "API access",
-        "Dedicated account manager"
+        "Custom profile themes",
+        "Group session hosting",
+        "Course creation tools",
+        "Dedicated support"
       ],
       popular: false,
       buttonText: "Become Expert"
@@ -64,11 +70,11 @@ const PricingSection = () => {
         {/* Section Header */}
         <div className="text-center mb-16">
           <h2 className="text-4xl font-bold text-foreground mb-4">
-            Choose Your Learning Journey
+            Start Learning for Free
           </h2>
           <p className="text-xl text-muted-foreground max-w-3xl mx-auto">
-            Unlock premium features to accelerate your skill development and teaching opportunities. 
-            All plans include access to our vibrant community.
+            Our core skill-swapping features are completely free. Upgrade to unlock premium tools 
+            when you're ready to take your learning journey to the next level.
           </p>
         </div>
 
@@ -81,13 +87,13 @@ const PricingSection = () => {
                 key={index} 
                 className={`relative overflow-hidden transition-all duration-300 hover:scale-105 ${
                   plan.popular 
-                    ? 'border-primary shadow-glow bg-gradient-card' 
+                    ? 'border-primary shadow-glow bg-gradient-to-br from-primary/5 to-primary/10' 
                     : 'border-border hover:shadow-medium'
                 }`}
               >
                 {plan.popular && (
-                  <div className="absolute top-0 left-0 right-0 bg-gradient-primary text-primary-foreground text-center py-2 text-sm font-medium">
-                    Most Popular
+                  <div className="absolute top-0 left-0 right-0 bg-gradient-to-r from-green-500 to-blue-500 text-white text-center py-2 text-sm font-medium">
+                    Recommended
                   </div>
                 )}
                 
@@ -118,17 +124,35 @@ const PricingSection = () => {
                     ))}
                   </ul>
 
-                  <Button 
-                    className={`w-full ${
-                      plan.popular 
-                        ? 'bg-gradient-primary hover:shadow-glow' 
-                        : 'variant-outline'
-                    }`}
-                    variant={plan.popular ? "default" : "outline"}
-                    size="lg"
-                  >
-                    {plan.buttonText}
-                  </Button>
+                  {isSignedIn ? (
+                    <Link to={plan.name === "Free Forever" ? "/profile" : "/profile"}>
+                      <Button 
+                        className={`w-full ${
+                          plan.popular 
+                            ? 'bg-gradient-to-r from-green-500 to-blue-500 hover:shadow-glow' 
+                            : ''
+                        }`}
+                        variant={plan.popular ? "default" : "outline"}
+                        size="lg"
+                      >
+                        {plan.name === "Free Forever" ? "Go to Profile" : plan.buttonText}
+                      </Button>
+                    </Link>
+                  ) : (
+                    <SignUpButton mode="modal">
+                      <Button 
+                        className={`w-full ${
+                          plan.popular 
+                            ? 'bg-gradient-to-r from-green-500 to-blue-500 hover:shadow-glow' 
+                            : ''
+                        }`}
+                        variant={plan.popular ? "default" : "outline"}
+                        size="lg"
+                      >
+                        {plan.buttonText}
+                      </Button>
+                    </SignUpButton>
+                  )}
                 </CardContent>
               </Card>
             );
@@ -138,11 +162,10 @@ const PricingSection = () => {
         {/* Bottom Note */}
         <div className="text-center mt-12">
           <p className="text-muted-foreground mb-4">
-            All plans include a 7-day free trial. No credit card required.
+            <strong>No hidden fees.</strong> Core skill-swapping features are always free.
           </p>
           <p className="text-sm text-muted-foreground">
-            Prices in Indian Rupees (₹). Cancel anytime. 
-            <a href="#" className="text-primary hover:underline ml-1">View detailed comparison</a>
+            Premium plans can be cancelled anytime. All prices in Indian Rupees (₹).
           </p>
         </div>
       </div>

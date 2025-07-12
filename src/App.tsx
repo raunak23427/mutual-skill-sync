@@ -6,10 +6,10 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { ClerkProvider } from '@clerk/clerk-react';
 import ProtectedRoute from "@/components/auth/ProtectedRoute";
 import Index from "./pages/Index";
-import Profile from "./pages/Profile";
-import Search from "./pages/Search";
-import Requests from "./pages/Requests";
-import Feedback from "./pages/Feedback";
+import ProfilePage from "./pages/Profile";
+import SearchPage from "./pages/Search";
+import RequestsPage from "./pages/Requests";
+import FeedbackPage from "./pages/Feedback";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 
@@ -31,12 +31,19 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<Index />} />
-            <Route path="/search" element={<Search />} />
+            <Route 
+              path="/search" 
+              element={
+                <ProtectedRoute>
+                  <SearchPage />
+                </ProtectedRoute>
+              } 
+            />
             <Route 
               path="/profile" 
               element={
                 <ProtectedRoute>
-                  <Profile />
+                  <ProfilePage />
                 </ProtectedRoute>
               } 
             />
@@ -44,7 +51,7 @@ const App = () => (
               path="/requests" 
               element={
                 <ProtectedRoute>
-                  <Requests />
+                  <RequestsPage />
                 </ProtectedRoute>
               } 
             />
@@ -52,7 +59,7 @@ const App = () => (
               path="/feedback" 
               element={
                 <ProtectedRoute>
-                  <Feedback />
+                  <FeedbackPage />
                 </ProtectedRoute>
               } 
             />
@@ -64,7 +71,6 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
         </BrowserRouter>

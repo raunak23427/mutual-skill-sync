@@ -1,259 +1,452 @@
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
-import { Search as SearchIcon, Filter, Grid3X3, List, Star, MapPin, Clock, MessageSquare } from "lucide-react";
+import React, { useState, useEffect } from 'react';
+import { useUser } from '@clerk/clerk-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { useToast } from '@/hooks/use-toast';
+import { Search as SearchIcon, Filter, Star, MapPin, Clock, MessageSquare, Grid3X3, List, Send } from 'lucide-react';
+import { profileService, skillsService, swapRequestService } from '@/lib/api';
+import type { Profile, Skill } from '@/lib/supabase';
 
-const Search = () => {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isGridView, setIsGridView] = useState(true);
-  const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
+const SearchPage = () => {
+  const { user } = useUser();
   const { toast } = useToast();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [profiles, setProfiles] = useState<any[]>([]);
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [filteredProfiles, setFilteredProfiles] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isGridView, setIsGridView] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedSkill, setSelectedSkill] = useState('');
+  
+  // Swap request modal state
+  const [isRequestModalOpen, setIsRequestModalOpen] = useState(false);
+  const [selectedProfile, setSelectedProfile] = useState<any>(null);
+  const [requestMessage, setRequestMessage] = useState('');
+  const [requestLoading, setRequestLoading] = useState(false);
 
-  const filters = [
-    "Available Now",
-    "This Week", 
-    "Weekends Only",
-    "Remote",
-    "In-Person",
-    "Beginner Friendly",
-    "Advanced Level"
-  ];
+  useEffect(() => {
+    loadData();
+  }, []);
 
-  const users = [
-    {
-      id: 1,
-      name: "Sarah Chen",
-      location: "San Francisco, CA",
-      avatar: "SC",
-      rating: 4.9,
-      skillsOffered: ["React", "TypeScript", "UI/UX Design"],
-      skillsWanted: ["Python", "Machine Learning"],
-      availability: "Weekends",
-      isOnline: true
-    },
-    {
-      id: 2,
-      name: "Mike Rodriguez",
-      location: "Austin, TX",
-      avatar: "MR",
-      rating: 4.8,
-      skillsOffered: ["Photography", "Photoshop", "Video Editing"],
-      skillsWanted: ["Web Development", "JavaScript"],
-      availability: "Evenings",
-      isOnline: false
-    },
-    {
-      id: 3,
-      name: "Emily Watson",
-      location: "New York, NY",
-      avatar: "EW",
-      rating: 5.0,
-      skillsOffered: ["Spanish", "French", "Translation"],
-      skillsWanted: ["Cooking", "Baking"],
-      availability: "Flexible",
-      isOnline: true
-    },
-    {
-      id: 4,
-      name: "David Kim",
-      location: "Seattle, WA",
-      avatar: "DK",
-      rating: 4.7,
-      skillsOffered: ["Guitar", "Music Theory", "Piano"],
-      skillsWanted: ["Fitness Training", "Nutrition"],
-      availability: "Weekdays",
-      isOnline: true
+  useEffect(() => {
+    filterProfiles();
+  }, [searchQuery, selectedCategory, selectedSkill, profiles]);
+
+  const loadData = async () => {
+    try {
+      const [profilesData, skillsData] = await Promise.all([
+        profileService.getAllProfiles(),
+        skillsService.getAllSkills()
+      ]);
+      
+      setProfiles(profilesData || []);
+      setSkills(skillsData || []);
+    } catch (error) {
+      console.error('Error loading data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load data",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
-  ];
-
-  const toggleFilter = (filter: string) => {
-    setSelectedFilters(prev => 
-      prev.includes(filter) 
-        ? prev.filter(f => f !== filter)
-        : [...prev, filter]
-    );
   };
 
-  const handleConnect = (user: any) => {
-    // Store the request in localStorage for now
-    const existingRequests = JSON.parse(localStorage.getItem('swapRequests') || '[]');
-    const newRequest = {
-      id: Date.now(),
-      recipientId: user.id,
-      recipientName: user.name,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      message: `I'd like to learn ${user.skillsOffered[0]} and can teach you ${user.skillsWanted[0]}`
-    };
-    
-    localStorage.setItem('swapRequests', JSON.stringify([...existingRequests, newRequest]));
-    
-    toast({
-      title: "Request Sent!",
-      description: `Your skill swap request has been sent to ${user.name}`,
+  const filterProfiles = () => {
+    let filtered = profiles;
+
+    // Filter by search query
+    if (searchQuery.trim()) {
+      filtered = filtered.filter(profile => 
+        profile.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        profile.location?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        profile.user_skills_offered?.some((skill: any) => 
+          skill.skill?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+        ) ||
+        profile.user_skills_wanted?.some((skill: any) => 
+          skill.skill?.name?.toLowerCase().includes(searchQuery.toLowerCase())
+        )
+      );
+    }
+
+    // Filter by category
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(profile =>
+        profile.user_skills_offered?.some((skill: any) => 
+          skill.skill?.category?.toLowerCase() === selectedCategory.toLowerCase()
+        )
+      );
+    }
+
+    // Filter by specific skill
+    if (selectedSkill) {
+      filtered = filtered.filter(profile =>
+        profile.user_skills_offered?.some((skill: any) => 
+          skill.skill?.id === selectedSkill
+        )
+      );
+    }
+
+    // Filter out current user
+    if (user) {
+      filtered = filtered.filter(profile => profile.clerk_id !== user.id);
+    }
+
+    setFilteredProfiles(filtered);
+  };
+
+  const handleSendRequest = async () => {
+    if (!user || !selectedProfile || !requestMessage.trim()) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setRequestLoading(true);
+    try {
+      const request = await swapRequestService.createRequest(
+        user.id,
+        selectedProfile.id,
+        requestMessage
+      );
+
+      if (request) {
+        toast({
+          title: "Success",
+          description: "Swap request sent successfully!",
+        });
+        setIsRequestModalOpen(false);
+        setRequestMessage('');
+        setSelectedProfile(null);
+      }
+    } catch (error) {
+      console.error('Error sending request:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send request",
+        variant: "destructive"
+      });
+    } finally {
+      setRequestLoading(false);
+    }
+  };
+
+  const openRequestModal = (profile: any) => {
+    setSelectedProfile(profile);
+    setRequestMessage(`Hi ${profile.full_name || 'there'}! I'd love to exchange skills with you. I noticed you offer ${profile.user_skills_offered?.[0]?.skill?.name || 'some great skills'} and I'm really interested in learning more about that.`);
+    setIsRequestModalOpen(true);
+  };
+
+  const getUniqueCategories = () => {
+    const categories = new Set<string>();
+    skills.forEach(skill => {
+      if (skill.category) {
+        categories.add(skill.category);
+      }
     });
+    return Array.from(categories);
   };
 
-  const UserCard = ({ user, isGrid }: { user: any, isGrid: boolean }) => (
-    <Card className={`shadow-soft border-0 hover:shadow-medium transition-all duration-300 ${isGrid ? 'transform hover:scale-105' : ''}`}>
-      <CardContent className="p-6">
-        <div className={`flex ${isGrid ? 'flex-col' : 'items-center'} gap-4`}>
-          {/* Avatar & Basic Info */}
-          <div className={`flex ${isGrid ? 'items-center' : 'items-center'} gap-3 ${isGrid ? '' : 'min-w-0 flex-1'}`}>
-            <div className="relative">
-              <div className="w-12 h-12 bg-gradient-primary rounded-full flex items-center justify-center text-white font-semibold">
-                {user.avatar}
-              </div>
-              {user.isOnline && (
-                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-success rounded-full border-2 border-background"></div>
-              )}
-            </div>
-            <div className="min-w-0 flex-1">
-              <h3 className="font-semibold text-foreground">{user.name}</h3>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <MapPin className="w-3 h-3" />
-                <span className="truncate">{user.location}</span>
-              </div>
-              <div className="flex items-center gap-2 mt-1">
-                <div className="flex items-center gap-1">
-                  <Star className="w-3 h-3 fill-warning text-warning" />
-                  <span className="text-sm font-medium">{user.rating}</span>
-                </div>
-                <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                  <Clock className="w-3 h-3" />
-                  <span>{user.availability}</span>
-                </div>
-              </div>
-            </div>
-          </div>
+  const getSkillsByCategory = () => {
+    if (selectedCategory === 'all') return skills;
+    return skills.filter(skill => skill.category?.toLowerCase() === selectedCategory.toLowerCase());
+  };
 
-          {/* Skills */}
-          <div className={`space-y-3 ${isGrid ? 'w-full' : 'flex-1'}`}>
-            <div>
-              <p className="text-xs font-medium text-success mb-2">Can Teach:</p>
-              <div className="flex flex-wrap gap-1">
-                {user.skillsOffered.slice(0, isGrid ? 3 : 2).map((skill: string, index: number) => (
-                  <Badge key={index} variant="secondary" className="bg-success/10 text-success border-success/20 text-xs">
-                    {skill}
-                  </Badge>
-                ))}
-                {user.skillsOffered.length > (isGrid ? 3 : 2) && (
-                  <Badge variant="secondary" className="text-xs">
-                    +{user.skillsOffered.length - (isGrid ? 3 : 2)}
-                  </Badge>
-                )}
-              </div>
-            </div>
-            <div>
-              <p className="text-xs font-medium text-primary mb-2">Wants to Learn:</p>
-              <div className="flex flex-wrap gap-1">
-                {user.skillsWanted.slice(0, isGrid ? 2 : 1).map((skill: string, index: number) => (
-                  <Badge key={index} variant="secondary" className="bg-primary/10 text-primary border-primary/20 text-xs">
-                    {skill}
-                  </Badge>
-                ))}
-                {user.skillsWanted.length > (isGrid ? 2 : 1) && (
-                  <Badge variant="secondary" className="text-xs">
-                    +{user.skillsWanted.length - (isGrid ? 2 : 1)}
-                  </Badge>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Action Button */}
-          <div className={isGrid ? 'w-full' : ''}>
-            <Button variant="outline" size="sm" className="w-full" onClick={() => handleConnect(user)}>
-              <MessageSquare className="w-4 h-4 mr-2" />
-              Connect
-            </Button>
+  if (loading) {
+    return (
+      <div className="container mx-auto px-4 py-8">
+        <div className="animate-pulse space-y-4">
+          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+          <div className="h-12 bg-gray-200 rounded"></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="h-64 bg-gray-200 rounded"></div>
+            ))}
           </div>
         </div>
-      </CardContent>
-    </Card>
-  );
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen bg-background py-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <div className="container mx-auto px-4 py-8 max-w-7xl">
+      <div className="space-y-8">
         {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-foreground">Find Skills</h1>
-          <p className="text-muted-foreground mt-2">Discover people with the skills you want to learn</p>
+        <div className="text-center">
+          <h1 className="text-3xl font-bold mb-2">Find Skill Partners</h1>
+          <p className="text-muted-foreground">Connect with people who can teach you new skills</p>
         </div>
 
-        {/* Search & Filters */}
-        <Card className="mb-8 shadow-soft border-0">
+        {/* Search and Filters */}
+        <Card>
           <CardContent className="p-6">
-            {/* Search Bar */}
-            <div className="relative mb-6">
-              <SearchIcon className="absolute left-3 top-3 w-5 h-5 text-muted-foreground" />
-              <Input
-                placeholder="Search by skill (e.g., Photoshop, Guitar, Spanish)"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 text-lg h-12"
-              />
-            </div>
+            <div className="space-y-4">
+              {/* Search Bar */}
+              <div className="relative">
+                <SearchIcon className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
+                <Input
+                  placeholder="Search by name, location, or skills..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
 
-            {/* Filter Chips */}
-            <div className="flex flex-wrap gap-2 mb-4">
-              {filters.map((filter) => (
-                <Badge
-                  key={filter}
-                  variant={selectedFilters.includes(filter) ? "default" : "secondary"}
-                  className="cursor-pointer hover:shadow-soft transition-all"
-                  onClick={() => toggleFilter(filter)}
-                >
-                  {filter}
-                </Badge>
-              ))}
-            </div>
+              {/* Filters */}
+              <div className="flex flex-wrap gap-4 items-center">
+                <div className="flex items-center space-x-2">
+                  <Filter className="w-4 h-4" />
+                  <span className="text-sm font-medium">Filters:</span>
+                </div>
 
-            {/* View Toggle & Results Count */}
-            <div className="flex items-center justify-between">
-              <p className="text-sm text-muted-foreground">
-                {users.length} people found
-              </p>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant={isGridView ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setIsGridView(true)}
-                >
-                  <Grid3X3 className="w-4 h-4" />
-                </Button>
-                <Button
-                  variant={!isGridView ? "default" : "ghost"}
-                  size="sm"
-                  onClick={() => setIsGridView(false)}
-                >
-                  <List className="w-4 h-4" />
-                </Button>
+                <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                  <SelectTrigger className="w-40">
+                    <SelectValue placeholder="Category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Categories</SelectItem>
+                    {getUniqueCategories().map((category) => (
+                      <SelectItem key={category} value={category.toLowerCase()}>
+                        {category}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={selectedSkill} onValueChange={setSelectedSkill}>
+                  <SelectTrigger className="w-48">
+                    <SelectValue placeholder="Specific Skill" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="">All Skills</SelectItem>
+                    {getSkillsByCategory().map((skill) => (
+                      <SelectItem key={skill.id} value={skill.id}>
+                        {skill.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <div className="flex-1" />
+
+                {/* View Toggle */}
+                <div className="flex items-center border rounded-lg">
+                  <Button
+                    variant={isGridView ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setIsGridView(true)}
+                  >
+                    <Grid3X3 className="w-4 h-4" />
+                  </Button>
+                  <Button
+                    variant={!isGridView ? "default" : "ghost"}
+                    size="sm"
+                    onClick={() => setIsGridView(false)}
+                  >
+                    <List className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           </CardContent>
         </Card>
 
         {/* Results */}
-        <div className={`${isGridView ? 'grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6' : 'space-y-4'}`}>
-          {users.map((user) => (
-            <UserCard key={user.id} user={user} isGrid={isGridView} />
-          ))}
-        </div>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-semibold">
+              {filteredProfiles.length} {filteredProfiles.length === 1 ? 'person' : 'people'} found
+            </h2>
+          </div>
 
-        {/* Load More */}
-        <div className="text-center mt-12">
-          <Button variant="outline" size="lg">
-            Load More Results
-          </Button>
+          {filteredProfiles.length === 0 ? (
+            <Card>
+              <CardContent className="p-12 text-center">
+                <SearchIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">No results found</h3>
+                <p className="text-muted-foreground">
+                  Try adjusting your search criteria or browse all available profiles
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className={isGridView 
+              ? "grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" 
+              : "space-y-4"
+            }>
+              {filteredProfiles.map((profile) => (
+                <Card key={profile.id} className="hover:shadow-lg transition-shadow">
+                  <CardContent className="p-6">
+                    <div className={isGridView ? "space-y-4" : "flex items-center space-x-6"}>
+                      {/* Avatar and Basic Info */}
+                      <div className={isGridView ? "text-center" : "flex items-center space-x-4"}>
+                        <Avatar className={isGridView ? "w-16 h-16 mx-auto" : "w-12 h-12"}>
+                          <AvatarImage src={profile.avatar_url} />
+                          <AvatarFallback>
+                            {profile.full_name?.charAt(0) || 'U'}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className={isGridView ? "mt-2" : ""}>
+                          <h3 className="font-semibold">{profile.full_name || 'Anonymous'}</h3>
+                          <div className="flex items-center text-sm text-muted-foreground">
+                            <Star className="w-3 h-3 mr-1 text-yellow-500" />
+                            <span>{profile.rating?.toFixed(1) || '0.0'}</span>
+                            <span className="mx-1">•</span>
+                            <span>{profile.total_swaps || 0} swaps</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Details */}
+                      <div className={isGridView ? "space-y-3" : "flex-1 space-y-2"}>
+                        {/* Location and Availability */}
+                        <div className={isGridView ? "space-y-1" : "flex items-center space-x-4"}>
+                          {profile.location && (
+                            <div className="flex items-center text-sm text-muted-foreground">
+                              <MapPin className="w-3 h-3 mr-1" />
+                              <span>{profile.location}</span>
+                            </div>
+                          )}
+                          {profile.availability && (
+                            <div className="flex items-center text-sm text-muted-foreground">
+                              <Clock className="w-3 h-3 mr-1" />
+                              <span>{profile.availability}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Skills Offered */}
+                        {profile.user_skills_offered?.length > 0 && (
+                          <div>
+                            <p className="text-sm font-medium mb-1">Can teach:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {profile.user_skills_offered.slice(0, 3).map((userSkill: any, index: number) => (
+                                <Badge key={index} variant="secondary" className="text-xs">
+                                  {userSkill.skill?.name}
+                                </Badge>
+                              ))}
+                              {profile.user_skills_offered.length > 3 && (
+                                <Badge variant="outline" className="text-xs">
+                                  +{profile.user_skills_offered.length - 3} more
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Skills Wanted */}
+                        {profile.user_skills_wanted?.length > 0 && (
+                          <div>
+                            <p className="text-sm font-medium mb-1">Wants to learn:</p>
+                            <div className="flex flex-wrap gap-1">
+                              {profile.user_skills_wanted.slice(0, 3).map((userSkill: any, index: number) => (
+                                <Badge key={index} variant="outline" className="text-xs">
+                                  {userSkill.skill?.name}
+                                </Badge>
+                              ))}
+                              {profile.user_skills_wanted.length > 3 && (
+                                <Badge variant="outline" className="text-xs">
+                                  +{profile.user_skills_wanted.length - 3} more
+                                </Badge>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Action Button */}
+                      <div className={isGridView ? "" : "ml-auto"}>
+                        <Button
+                          onClick={() => openRequestModal(profile)}
+                          className="w-full"
+                          size="sm"
+                        >
+                          <MessageSquare className="w-4 h-4 mr-2" />
+                          Request Swap
+                        </Button>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
         </div>
       </div>
+
+      {/* Swap Request Modal */}
+      <Dialog open={isRequestModalOpen} onOpenChange={setIsRequestModalOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Send Swap Request</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {selectedProfile && (
+              <div className="flex items-center space-x-3 p-3 bg-muted rounded-lg">
+                <Avatar className="w-10 h-10">
+                  <AvatarImage src={selectedProfile.avatar_url} />
+                  <AvatarFallback>
+                    {selectedProfile.full_name?.charAt(0) || 'U'}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-medium">{selectedProfile.full_name || 'Anonymous'}</p>
+                  <p className="text-sm text-muted-foreground">{selectedProfile.location}</p>
+                </div>
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="message">Message</Label>
+              <Textarea
+                id="message"
+                value={requestMessage}
+                onChange={(e) => setRequestMessage(e.target.value)}
+                placeholder="Write a message to introduce yourself and explain what you'd like to learn/teach..."
+                rows={4}
+              />
+            </div>
+
+            <div className="flex space-x-2">
+              <Button
+                variant="outline"
+                onClick={() => setIsRequestModalOpen(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleSendRequest}
+                disabled={requestLoading || !requestMessage.trim()}
+                className="flex-1"
+              >
+                {requestLoading ? (
+                  'Sending...'
+                ) : (
+                  <>
+                    <Send className="w-4 h-4 mr-2" />
+                    Send Request
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
 
-export default Search;
+export default SearchPage;
