@@ -3,12 +3,14 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { useToast } from "@/hooks/use-toast";
 import { Search as SearchIcon, Filter, Grid3X3, List, Star, MapPin, Clock, MessageSquare } from "lucide-react";
 
 const Search = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [isGridView, setIsGridView] = useState(true);
   const [selectedFilters, setSelectedFilters] = useState<string[]>([]);
+  const { toast } = useToast();
 
   const filters = [
     "Available Now",
@@ -73,6 +75,26 @@ const Search = () => {
         ? prev.filter(f => f !== filter)
         : [...prev, filter]
     );
+  };
+
+  const handleConnect = (user: any) => {
+    // Store the request in localStorage for now
+    const existingRequests = JSON.parse(localStorage.getItem('swapRequests') || '[]');
+    const newRequest = {
+      id: Date.now(),
+      recipientId: user.id,
+      recipientName: user.name,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+      message: `I'd like to learn ${user.skillsOffered[0]} and can teach you ${user.skillsWanted[0]}`
+    };
+    
+    localStorage.setItem('swapRequests', JSON.stringify([...existingRequests, newRequest]));
+    
+    toast({
+      title: "Request Sent!",
+      description: `Your skill swap request has been sent to ${user.name}`,
+    });
   };
 
   const UserCard = ({ user, isGrid }: { user: any, isGrid: boolean }) => (
@@ -144,7 +166,7 @@ const Search = () => {
 
           {/* Action Button */}
           <div className={isGrid ? 'w-full' : ''}>
-            <Button variant="outline" size="sm" className="w-full">
+            <Button variant="outline" size="sm" className="w-full" onClick={() => handleConnect(user)}>
               <MessageSquare className="w-4 h-4 mr-2" />
               Connect
             </Button>

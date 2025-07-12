@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -33,28 +33,13 @@ const Requests = () => {
     }
   ]);
 
-  const [outgoingRequests] = useState([
-    {
-      id: 3,
-      to: "Emily Watson",
-      avatar: "EW",
-      skillOffered: "JavaScript",
-      skillWanted: "Spanish",
-      message: "I can teach you JavaScript fundamentals. Would love to learn Spanish conversation skills!",
-      date: "2024-01-13",
-      status: "pending"
-    },
-    {
-      id: 4,
-      to: "David Kim",
-      avatar: "DK",
-      skillOffered: "Design",
-      skillWanted: "Guitar",
-      message: "UI/UX designer here! Would love to learn guitar basics in exchange for design lessons.",
-      date: "2024-01-12",
-      status: "accepted"
-    }
-  ]);
+  const [outgoingRequests, setOutgoingRequests] = useState<any[]>([]);
+
+  // Load outgoing requests from localStorage
+  useEffect(() => {
+    const savedRequests = JSON.parse(localStorage.getItem('swapRequests') || '[]');
+    setOutgoingRequests(savedRequests);
+  }, []);
 
   const [completedSwaps] = useState([
     {
@@ -95,6 +80,14 @@ const Requests = () => {
   };
 
   const handleDelete = (requestId: number) => {
+    // Remove from localStorage
+    const currentRequests = JSON.parse(localStorage.getItem('swapRequests') || '[]');
+    const updatedRequests = currentRequests.filter((req: any) => req.id !== requestId);
+    localStorage.setItem('swapRequests', JSON.stringify(updatedRequests));
+    
+    // Update state
+    setOutgoingRequests(updatedRequests);
+    
     toast({
       title: "Request Deleted",
       description: "The request has been removed from your list.",

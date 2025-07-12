@@ -1,66 +1,179 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
-import { Camera, Plus, X, MapPin, Clock, Save } from "lucide-react";
+import { Camera, Plus, X, MapPin, Clock, Save, Upload } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { useProfileSync } from "@/hooks/useProfileSync";
+import { userSkillsService, uploadService } from "@/lib/api";
 
 const Profile = () => {
   const { toast } = useToast();
-  const [profile, setProfile] = useState({
-    name: "Alex Johnson",
-    location: "San Francisco, CA",
-    availability: "Weekends",
-    isPublic: true,
-    skillsOffered: ["JavaScript", "React", "Photography", "Guitar"],
-    skillsWanted: ["Python", "Machine Learning", "Cooking", "Spanish"]
-  });
-
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { profile, loading, updateProfile, clerkUser } = useProfileSync();
+  
+  const [skillsOffered, setSkillsOffered] = useState<string[]>([]);
+  const [skillsWanted, setSkillsWanted] = useState<string[]>([]);
   const [newSkillOffered, setNewSkillOffered] = useState("");
   const [newSkillWanted, setNewSkillWanted] = useState("");
+  const [uploading, setUploading] = useState(false);
 
-  const addSkill = (type: 'offered' | 'wanted') => {
+  // Load user skills when profile loads
+  useEffect(() => {
+    const loadUserSkills = async () => {
+      if (!profile) return;
+
+      const [offered, wanted] = await Promise.all([
+        userSkillsService.getUserSkillsOffered(profile.id),
+        userSkillsService.getUserSkillsWanted(profile.id)
+      ]);
+
+      setSkillsOffered(offered);
+      setSkillsWanted(wanted);
+    };
+
+    loadUserSkills();
+  }, [profile]);
+
+  const addSkill = async (type: 'offered' | 'wanted') => {
     const skill = type === 'offered' ? newSkillOffered : newSkillWanted;
-    if (!skill.trim()) return;
+    if (!skill.trim() || !profile) return;
 
-    if (type === 'offered') {
-      setProfile(prev => ({
-        ...prev,
-        skillsOffered: [...prev.skillsOffered, skill.trim()]
-      }));
-      setNewSkillOffered("");
+    const success = type === 'offered' 
+      ? await userSkillsService.addSkillOffered(profile.id, skill.trim())
+      : await userSkillsService.addSkillWanted(profile.id, skill.trim());
+
+    if (success) {
+      if (type === 'offered') {
+        setSkillsOffered(prev => [...prev, skill.trim()]);
+        setNewSkillOffered("");
+      } else {
+        setSkillsWanted(prev => [...prev, skill.trim()]);
+        setNewSkillWanted("");
+      }
+      
+      toast({
+        title: "Skill Added",
+        description: `${skill} has been added to your ${type} skills.`,
+      });
     } else {
-      setProfile(prev => ({
-        ...prev,
-        skillsWanted: [...prev.skillsWanted, skill.trim()]
-      }));
-      setNewSkillWanted("");
+      toast({
+        title: "Error",
+        description: "Failed to add skill. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
-  const removeSkill = (type: 'offered' | 'wanted', index: number) => {
-    if (type === 'offered') {
-      setProfile(prev => ({
-        ...prev,
-        skillsOffered: prev.skillsOffered.filter((_, i) => i !== index)
-      }));
+  const removeSkill = async (type: 'offered' | 'wanted', skillName: string) => {
+    if (!profile) return;
+
+    const success = type === 'offered'
+      ? await userSkillsService.removeSkillOffered(profile.id, skillName)
+      : await userSkillsService.removeSkillWanted(profile.id, skillName);
+
+    if (success) {
+      if (type === 'offered') {
+        setSkillsOffered(prev => prev.filter(skill => skill !== skillName));
+      } else {
+        setSkillsWanted(prev => prev.filter(skill => skill !== skillName));
+      }
+      
+      toast({
+        title: "Skill Removed",
+        description: `${skillName} has been removed from your ${type} skills.`,
+      });
     } else {
-      setProfile(prev => ({
-        ...prev,
-        skillsWanted: prev.skillsWanted.filter((_, i) => i !== index)
-      }));
+      toast({
+        title: "Error",
+        description: "Failed to remove skill. Please try again.",
+        variant: "destructive"
+      });
     }
   };
 
-  const handleSave = () => {
-    toast({
-      title: "Profile Updated",
-      description: "Your profile has been saved successfully.",
+  const handlePhotoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !profile || !clerkUser) return;
+
+    setUploading(true);
+    
+    try {
+      // Upload to Supabase Storage
+      const photoUrl = await uploadService.uploadProfilePhoto(clerkUser.id, file);
+      
+      if (photoUrl) {
+        // Update profile in database
+        await updateProfile({ avatar_url: photoUrl });
+        
+        toast({
+          title: "Photo Updated",
+          description: "Profile photo has been updated successfully!",
+        });
+      } else {
+        throw new Error("Upload failed");
+      }
+    } catch (error) {
+      console.error("Photo upload error:", error);
+      toast({
+        title: "Upload Failed",
+        description: "Failed to upload photo. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const triggerPhotoUpload = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleSave = async () => {
+    if (!profile) return;
+
+    const success = await updateProfile({
+      full_name: profile.full_name,
+      location: profile.location,
+      availability: profile.availability,
+      is_public: profile.is_public
     });
+
+    if (success) {
+      toast({
+        title: "Profile Updated",
+        description: "Your profile has been saved successfully.",
+      });
+    } else {
+      toast({
+        title: "Error",
+        description: "Failed to save profile. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-background py-8 flex items-center justify-center">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (!profile) {
+    return (
+      <div className="min-h-screen bg-background py-8 flex items-center justify-center">
+        <div className="text-center">
+          <h2 className="text-xl font-semibold">Profile not found</h2>
+          <p className="text-muted-foreground">Please try refreshing the page.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-background py-8">
@@ -82,12 +195,34 @@ const Profile = () => {
             <CardContent className="space-y-6">
               {/* Profile Photo */}
               <div className="flex flex-col items-center">
-                <div className="w-24 h-24 bg-gradient-primary rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-medium">
-                  AJ
+                <div className="w-24 h-24 bg-gradient-primary rounded-full flex items-center justify-center text-white text-2xl font-bold shadow-medium overflow-hidden">
+                  {profile.avatar_url ? (
+                    <img 
+                      src={profile.avatar_url} 
+                      alt="Profile" 
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    (profile.full_name || clerkUser?.firstName || "U").charAt(0).toUpperCase()
+                  )}
                 </div>
-                <Button variant="ghost" size="sm" className="mt-2">
-                  Change Photo
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  className="mt-2" 
+                  onClick={triggerPhotoUpload}
+                  disabled={uploading}
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  {uploading ? "Uploading..." : "Change Photo"}
                 </Button>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  className="hidden"
+                  accept="image/*"
+                  onChange={handlePhotoUpload}
+                />
               </div>
 
               {/* Basic Info */}
@@ -96,8 +231,8 @@ const Profile = () => {
                   <Label htmlFor="name">Name</Label>
                   <Input
                     id="name"
-                    value={profile.name}
-                    onChange={(e) => setProfile(prev => ({ ...prev, name: e.target.value }))}
+                    value={profile.full_name || ""}
+                    onChange={(e) => updateProfile({ full_name: e.target.value })}
                   />
                 </div>
 
@@ -107,9 +242,10 @@ const Profile = () => {
                     <MapPin className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
                     <Input
                       id="location"
-                      value={profile.location}
-                      onChange={(e) => setProfile(prev => ({ ...prev, location: e.target.value }))}
+                      placeholder="San Francisco, CA"
+                      value={profile.location || ""}
                       className="pl-10"
+                      onChange={(e) => updateProfile({ location: e.target.value })}
                     />
                   </div>
                 </div>
@@ -120,23 +256,23 @@ const Profile = () => {
                     <Clock className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
                     <Input
                       id="availability"
+                      placeholder="Weekends, Evenings, etc."
                       value={profile.availability}
-                      onChange={(e) => setProfile(prev => ({ ...prev, availability: e.target.value }))}
                       className="pl-10"
+                      onChange={(e) => updateProfile({ availability: e.target.value })}
                     />
                   </div>
                 </div>
 
-                {/* Privacy Toggle */}
-                <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+                {/* Public Profile Toggle */}
+                <div className="flex items-center justify-between p-4 bg-muted rounded-lg">
                   <div>
-                    <Label htmlFor="public-profile">Public Profile</Label>
-                    <p className="text-sm text-muted-foreground">Make your profile visible to others</p>
+                    <p className="font-medium">Public Profile</p>
+                    <p className="text-sm text-muted-foreground">Allow others to find you</p>
                   </div>
                   <Switch
-                    id="public-profile"
-                    checked={profile.isPublic}
-                    onCheckedChange={(checked) => setProfile(prev => ({ ...prev, isPublic: checked }))}
+                    checked={profile.is_public}
+                    onCheckedChange={(checked) => updateProfile({ is_public: checked })}
                   />
                 </div>
               </div>
@@ -164,19 +300,22 @@ const Profile = () => {
                   </Button>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {profile.skillsOffered.map((skill, index) => (
+                  {skillsOffered.map((skill, index) => (
                     <Badge key={index} variant="secondary" className="bg-success/10 text-success border-success/20">
                       {skill}
                       <Button
                         variant="ghost"
                         size="sm"
                         className="h-auto p-0 ml-2 hover:bg-transparent"
-                        onClick={() => removeSkill('offered', index)}
+                        onClick={() => removeSkill('offered', skill)}
                       >
                         <X className="w-3 h-3" />
                       </Button>
                     </Badge>
                   ))}
+                  {skillsOffered.length === 0 && (
+                    <p className="text-muted-foreground text-sm">No skills added yet. Add some skills you can teach!</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -200,19 +339,22 @@ const Profile = () => {
                   </Button>
                 </div>
                 <div className="flex flex-wrap gap-2">
-                  {profile.skillsWanted.map((skill, index) => (
+                  {skillsWanted.map((skill, index) => (
                     <Badge key={index} variant="secondary" className="bg-primary/10 text-primary border-primary/20">
                       {skill}
                       <Button
                         variant="ghost"
                         size="sm"
                         className="h-auto p-0 ml-2 hover:bg-transparent"
-                        onClick={() => removeSkill('wanted', index)}
+                        onClick={() => removeSkill('wanted', skill)}
                       >
                         <X className="w-3 h-3" />
                       </Button>
                     </Badge>
                   ))}
+                  {skillsWanted.length === 0 && (
+                    <p className="text-muted-foreground text-sm">No skills added yet. Add some skills you want to learn!</p>
+                  )}
                 </div>
               </CardContent>
             </Card>

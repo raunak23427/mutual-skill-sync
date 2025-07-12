@@ -1,9 +1,11 @@
 import { Button } from "@/components/ui/button";
 import { Search, User, MessageSquare, Star, Settings } from "lucide-react";
 import { Link, useLocation } from "react-router-dom";
+import { SignInButton, SignUpButton, UserButton, useUser } from '@clerk/clerk-react';
 
 const Navigation = () => {
   const location = useLocation();
+  const { isSignedIn } = useUser();
   
   const navItems = [
     { path: "/", label: "Home", icon: null },
@@ -49,12 +51,28 @@ const Navigation = () => {
 
           {/* Auth Buttons */}
           <div className="flex items-center space-x-2">
-            <Button variant="ghost" size="sm">
-              Login
-            </Button>
-            <Button variant="hero" size="sm">
-              Sign Up
-            </Button>
+            {isSignedIn ? (
+              <UserButton 
+                appearance={{
+                  elements: {
+                    avatarBox: "w-8 h-8"
+                  }
+                }}
+              />
+            ) : (
+              <>
+                <SignInButton mode="modal">
+                  <Button variant="ghost" size="sm">
+                    Login
+                  </Button>
+                </SignInButton>
+                <SignUpButton mode="modal">
+                  <Button variant="hero" size="sm">
+                    Sign Up
+                  </Button>
+                </SignUpButton>
+              </>
+            )}
           </div>
         </div>
       </div>
