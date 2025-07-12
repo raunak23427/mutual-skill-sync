@@ -2,14 +2,63 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+/* Skill Swap Platform Design System - Professional & Clean */
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 0 0% 99%;
+    --foreground: 230 15% 15%;
+    
+    /* Primary - Professional Blue */
+    --primary: 220 90% 56%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 220 85% 52%;
+    
+    /* Secondary - Soft Purple */
+    --secondary: 255 85% 95%;
+    --secondary-foreground: 255 30% 25%;
+    
+    /* Accent - Vibrant Orange */
+    --accent: 25 100% 60%;
+    --accent-foreground: 0 0% 100%;
+    
+    /* Muted - Light Gray */
+    --muted: 220 15% 96%;
+    --muted-foreground: 220 15% 45%;
+    
+    /* Success & Status Colors */
+    --success: 145 65% 50%;
+    --success-foreground: 0 0% 100%;
+    --warning: 45 100% 55%;
+    --warning-foreground: 0 0% 100%;
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 100%;
+    
+    /* UI Elements */
+    --card: 0 0% 100%;
+    --card-foreground: 230 15% 15%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 230 15% 15%;
+    --border: 220 20% 88%;
+    --input: 220 20% 88%;
+    --ring: 220 90% 56%;
+    
+    /* Gradients */
+    --gradient-primary: linear-gradient(135deg, hsl(220 90% 56%), hsl(255 85% 65%));
+    --gradient-hero: linear-gradient(135deg, hsl(220 90% 56%), hsl(255 85% 65%), hsl(25 100% 60%));
+    --gradient-card: linear-gradient(145deg, hsl(0 0% 100%), hsl(220 15% 98%));
+    
+    /* Shadows */
+    --shadow-soft: 0 4px 6px -1px hsl(220 20% 20% / 0.05), 0 2px 4px -1px hsl(220 20% 20% / 0.03);
+    --shadow-medium: 0 10px 15px -3px hsl(220 20% 20% / 0.08), 0 4px 6px -2px hsl(220 20% 20% / 0.03);
+    --shadow-large: 0 20px 25px -5px hsl(220 20% 20% / 0.1), 0 10px 10px -5px hsl(220 20% 20% / 0.04);
+    --shadow-glow: 0 0 30px hsl(220 90% 56% / 0.3);
+    
+    /* Animations */
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-fast: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+    
+    --radius: 0.75rem;
 
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
@@ -56,8 +105,42 @@ All colors MUST be HSL.
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 230 25% 8%;
+    --foreground: 220 15% 95%;
+    
+    --primary: 220 85% 60%;
+    --primary-foreground: 0 0% 100%;
+    --primary-hover: 220 80% 65%;
+    
+    --secondary: 255 20% 15%;
+    --secondary-foreground: 255 85% 95%;
+    
+    --accent: 25 95% 65%;
+    --accent-foreground: 0 0% 100%;
+    
+    --muted: 220 25% 12%;
+    --muted-foreground: 220 15% 65%;
+    
+    --success: 145 60% 55%;
+    --warning: 45 95% 60%;
+    --destructive: 0 65% 60%;
+    
+    --card: 230 25% 10%;
+    --card-foreground: 220 15% 95%;
+    --popover: 230 25% 10%;
+    --popover-foreground: 220 15% 95%;
+    --border: 220 25% 18%;
+    --input: 220 25% 18%;
+    --ring: 220 85% 60%;
+    
+    --gradient-primary: linear-gradient(135deg, hsl(220 85% 60%), hsl(255 75% 70%));
+    --gradient-hero: linear-gradient(135deg, hsl(220 85% 60%), hsl(255 75% 70%), hsl(25 95% 65%));
+    --gradient-card: linear-gradient(145deg, hsl(230 25% 10%), hsl(220 25% 12%));
+    
+    --shadow-soft: 0 4px 6px -1px hsl(0 0% 0% / 0.2), 0 2px 4px -1px hsl(0 0% 0% / 0.1);
+    --shadow-medium: 0 10px 15px -3px hsl(0 0% 0% / 0.25), 0 4px 6px -2px hsl(0 0% 0% / 0.1);
+    --shadow-large: 0 20px 25px -5px hsl(0 0% 0% / 0.3), 0 10px 10px -5px hsl(0 0% 0% / 0.1);
+    --shadow-glow: 0 0 30px hsl(220 85% 60% / 0.4);
 
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
