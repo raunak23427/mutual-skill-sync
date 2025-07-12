@@ -16,7 +16,9 @@ import {
   Ban, 
   Send,
   Search,
-  Filter
+  Filter,
+  RefreshCw,
+  Activity
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
@@ -83,6 +85,49 @@ const Admin = () => {
     }
   ];
 
+  const swaps = [
+    {
+      id: 1,
+      requester: "Sarah Chen",
+      provider: "Mike Rodriguez",
+      requestedSkill: "React Development",
+      offeredSkill: "UI/UX Design",
+      status: "pending",
+      createdDate: "2024-01-15",
+      lastUpdated: "2024-01-15"
+    },
+    {
+      id: 2,
+      requester: "John Doe",
+      provider: "Sarah Chen",
+      requestedSkill: "Photography",
+      offeredSkill: "Blockchain Development",
+      status: "accepted",
+      createdDate: "2024-01-14",
+      lastUpdated: "2024-01-14"
+    },
+    {
+      id: 3,
+      requester: "Jane Smith",
+      provider: "Problem User",
+      requestedSkill: "Cryptocurrency Trading",
+      offeredSkill: "Marketing",
+      status: "cancelled",
+      createdDate: "2024-01-13",
+      lastUpdated: "2024-01-13"
+    },
+    {
+      id: 4,
+      requester: "Mike Rodriguez",
+      provider: "John Doe",
+      requestedSkill: "Python Programming",
+      offeredSkill: "UI/UX Design",
+      status: "completed",
+      createdDate: "2024-01-12",
+      lastUpdated: "2024-01-13"
+    }
+  ];
+
   const handleApproveSkill = (skillId: number) => {
     toast({
       title: "Skill Approved",
@@ -132,7 +177,7 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="skills" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="skills" className="flex items-center gap-2">
               <Shield className="w-4 h-4" />
               Moderate Skills
@@ -140,6 +185,10 @@ const Admin = () => {
             <TabsTrigger value="users" className="flex items-center gap-2">
               <Users className="w-4 h-4" />
               Manage Users
+            </TabsTrigger>
+            <TabsTrigger value="swaps" className="flex items-center gap-2">
+              <Activity className="w-4 h-4" />
+              Monitor Swaps
             </TabsTrigger>
             <TabsTrigger value="messages" className="flex items-center gap-2">
               <MessageSquare className="w-4 h-4" />
@@ -269,6 +318,105 @@ const Admin = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Monitor Swaps Tab */}
+          <TabsContent value="swaps" className="space-y-6">
+            <Card className="shadow-soft border-0">
+              <CardHeader>
+                <CardTitle>Swap Activity Monitor</CardTitle>
+                <div className="flex items-center justify-between mt-4">
+                  <p className="text-sm text-muted-foreground">
+                    Monitor all skill swap activities across the platform
+                  </p>
+                  <Button variant="outline" size="sm">
+                    <RefreshCw className="w-4 h-4 mr-2" />
+                    Refresh
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {swaps.map((swap) => (
+                    <div key={swap.id} className="flex items-center justify-between p-4 border rounded-lg">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-3 mb-2">
+                          <h3 className="font-semibold text-sm">
+                            {swap.requester} ↔ {swap.provider}
+                          </h3>
+                          <Badge 
+                            variant={
+                              swap.status === 'pending' ? 'secondary' :
+                              swap.status === 'accepted' ? 'default' :
+                              swap.status === 'completed' ? 'success' :
+                              'destructive'
+                            }
+                          >
+                            {swap.status}
+                          </Badge>
+                        </div>
+                        <div className="text-sm text-muted-foreground space-y-1">
+                          <p>
+                            <span className="font-medium">Requesting:</span> {swap.requestedSkill} 
+                            <span className="mx-2">•</span>
+                            <span className="font-medium">Offering:</span> {swap.offeredSkill}
+                          </p>
+                          <p>
+                            Created: {swap.createdDate} • Last updated: {swap.lastUpdated}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Button size="sm" variant="outline">
+                          View Details
+                        </Button>
+                        {swap.status === 'pending' && (
+                          <Button size="sm" variant="destructive">
+                            Cancel Swap
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Swap Statistics */}
+            <div className="grid md:grid-cols-4 gap-4">
+              <Card className="shadow-soft border-0">
+                <CardContent className="p-6">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-primary">12</div>
+                    <div className="text-sm text-muted-foreground">Pending Swaps</div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="shadow-soft border-0">
+                <CardContent className="p-6">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-green-600">24</div>
+                    <div className="text-sm text-muted-foreground">Accepted Swaps</div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="shadow-soft border-0">
+                <CardContent className="p-6">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-blue-600">56</div>
+                    <div className="text-sm text-muted-foreground">Completed Swaps</div>
+                  </div>
+                </CardContent>
+              </Card>
+              <Card className="shadow-soft border-0">
+                <CardContent className="p-6">
+                  <div className="text-center">
+                    <div className="text-2xl font-bold text-red-600">3</div>
+                    <div className="text-sm text-muted-foreground">Cancelled Swaps</div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
           </TabsContent>
 
           {/* Global Messages Tab */}
